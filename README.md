@@ -47,20 +47,21 @@ Hoje, os tratamentos implementados podem ser considerados **básicos**, mas isso
 
 👉 Em outras palavras: **o laboratório continua**. Esse projeto ainda deve render boas evoluções no futuro.
 
----
-
-## 🧑‍💻 Como rodar
-```bash
-## clonar repositório
-git clone <url-do-repo>
-
-## entrar na pasta do projeto
-cd projetoexception
-
-## rodar com Maven
-./mvnw spring-boot:run
-
 A API estará disponível em:
 👉 http://localhost:8080/clientes
 
 ⚠️ É necessário ter um container Oracle rodando no Docker e configurar as credenciais no application.properties.
+---
+
+## 🧑‍💻 Como rodar
+```bash
+# clonar repositório
+git clone <url-do-repo>
+
+# entrar na pasta do projeto
+cd projetoexception
+
+# rodar com Maven
+./mvnw spring-boot:run
+
+
