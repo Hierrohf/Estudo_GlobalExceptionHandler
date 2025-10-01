@@ -1,0 +1,35 @@
+
+                                 Recebe requisição HTTP
+                                         │
+                    ┌────────────────────┴────────────────────┐
+                    │                                         │
+               Body da requisição?                        Somente parâmetros?
+                    │                                         │
+               ┌────┴────┐                                 ┌──┴──┐
+               │         │                                 │     │
+             Sim        Não                               Sim    Não
+               │         │                                 │     │
+             Validação  Outros endpoints                  Validação
+             do DTO     (Controller, etc)                de parâmetros
+               │                                           │
+               ▼                                           ▼
+            MethodArgumentNotValidException        ConstraintViolationException
+               │                                           │
+            ex.getBindingResult()                        ex.getConstraintViolations()
+               │                                           │
+            Itera FieldErrors                             Itera Violations
+               │                                           │
+            Cria lista de mensagens                        Cria lista de mensagens
+               │                                           │
+            Retorna 400 Bad Request                        Retorna 400 Bad Request
+               │                                           │
+               ▼                                           ▼
+            ------------------ Outros Erros -----------------
+                    │
+                    ├─ Recurso não encontrado → NoHandlerFoundException → 404 Not Found
+                    │
+                    ├─ Entidade não existe → EntityNotFoundException → 404 Not Found
+                    │
+                    ├─ Método HTTP não suportado → HttpRequestMethodNotSupportedException → 405 Method Not Allowed
+                    │
+                    └─ Erro do servidor → Exception / RuntimeException → 500 Internal Server Error
