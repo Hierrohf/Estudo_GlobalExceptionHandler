@@ -10,15 +10,23 @@ public class ErrorMessage {
 
     private Integer status;
     private LocalDateTime timestamp = LocalDateTime.now();
-    private List<String> Messages;
+    private List<String> messages;
+    private String detalhes;
 
-    public ErrorMessage(Integer status, String Messages) {
+    public ErrorMessage(Integer status, String messages) {
         this.status = status;
-        this.Messages = List.of(Messages);// transforma em lista de 1 elemento
+        this.messages = List.of(messages);// transforma em lista de 1 elemento
     }
 
-    public ErrorMessage(Integer status, List<String> Messages) {
+    public ErrorMessage(Integer status, List<String> messages, String detalhes) {
         this.status = status;
-        this.Messages = Messages;
+        this.messages = messages;
+        this.detalhes = detalhes;
+    }
+
+    public ErrorMessage(Integer status, String messages, String detalhes){
+        this.status = status;
+        this.messages = List.of(messages);
+        this.detalhes = detalhes;
     }
 }

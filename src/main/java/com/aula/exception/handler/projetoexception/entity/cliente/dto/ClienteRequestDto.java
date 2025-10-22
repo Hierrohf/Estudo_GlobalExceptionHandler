@@ -12,7 +12,7 @@ public record ClienteRequestDto(
         @Email(message = "não está no formato válido")
         String email,
 
-        @Pattern(
+        @Pattern(//##estudar mais essa anotacao!##
                 regexp = "\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}",
                 message = "deve estar no formato 000.000.000-00"
         )

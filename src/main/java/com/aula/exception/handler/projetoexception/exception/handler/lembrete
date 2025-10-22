@@ -1,0 +1,10 @@
+1- abstracao da var string detalhes presente nos metodos que estao
+marcados com @HandlerException :
+var detalhes = String.format("URI: '%s' | Método: '%s' | Query: '%s'.", //ps: ABSTRAIR ESSA LOGICA
+                request.getRequestURI(),
+                request.getMethod(),
+                request.getQueryString() != null ?
+                request.getQueryString() : "Nenhuma");
+
+2- abstracao da logica dentro do switch case que esta no metodo anotado com
+HandlerException

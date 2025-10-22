@@ -9,8 +9,7 @@ import com.aula.exception.handler.projetoexception.exception.business.ClienteNao
 import com.aula.exception.handler.projetoexception.exception.business.CpfJaCadastradoException;
 import com.aula.exception.handler.projetoexception.exception.business.EmailJaCadastradoException;
 import com.aula.exception.handler.projetoexception.exception.business.NomeJaCadastradoException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
+
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,8 +17,11 @@ import java.util.List;
 @Service
 public class ClienteServiceImpl implements ClienteService{
 
-    @Autowired
-    private ClienteRepository clienteRepository;
+    private final ClienteRepository clienteRepository;
+
+    public ClienteServiceImpl(ClienteRepository clienteRepository){
+        this.clienteRepository = clienteRepository;
+    }
 
     @Override
     public ClienteResponseDto salvarCliente(ClienteRequestDto dto) {

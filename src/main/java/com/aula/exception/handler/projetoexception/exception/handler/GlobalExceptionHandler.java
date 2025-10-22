@@ -1,12 +1,12 @@
 package com.aula.exception.handler.projetoexception.exception.handler;
 
-import com.aula.exception.handler.projetoexception.exception.business.ClienteNaoEncontradoException;
-import com.aula.exception.handler.projetoexception.exception.business.CpfJaCadastradoException;
-import com.aula.exception.handler.projetoexception.exception.business.EmailJaCadastradoException;
-import com.aula.exception.handler.projetoexception.exception.business.NomeJaCadastradoException;
+import com.aula.exception.handler.projetoexception.exception.ApplicationException;
 import com.aula.exception.handler.projetoexception.exception.message.ErrorMessage;
+import com.aula.exception.handler.projetoexception.util.FormatError;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
@@ -19,12 +19,72 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
-import java.nio.file.AccessDeniedException;
 import java.util.ArrayList;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(ApplicationException.class)
+    public ResponseEntity<ErrorMessage> handlerApplicationException(ApplicationException ex, HttpServletRequest request) {
+        var status = ex.getStatus();
+        var message = ex.getMessage();
+        var detalhes = FormatError.formatErrorDetalhe(request);
+
+        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), message, detalhes));
+    }
+
+    @ExceptionHandler({
+            MethodArgumentNotValidException.class,//estoura nas validacoes do dto
+            ConstraintViolationException.class,//estoura na validacao do @Valid nos parametros dos metodos
+            IllegalArgumentException.class,//estoura quando um metodo recebe um argumento invalido em seu parametro
+            DataIntegrityViolationException.class,//quebra de integridade no banco tipo coluna unique ou FK etc
+            HttpMessageNotReadableException.class//corpo da requisicao invalido (JSON mal formatado)
+    })
+    public ResponseEntity<ErrorMessage> handleBadRequest(Exception ex, HttpServletRequest request) {
+        var status = HttpStatus.BAD_REQUEST;
+        var detalhes = FormatError.formatErrorDetalhe(request);
+        var errorMessages = new ArrayList<String>(FormatError.formatErrorBadRequest(ex));
+
+        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), errorMessages, detalhes));
+    }
+
+    @ExceptionHandler({
+            NoHandlerFoundException.class,//rota nao encontrada
+            EntityNotFoundException.class,//entidade nao existe no banco
+            EmptyResultDataAccessException.class})
+//acesso a registro no banco inexistente | acessar, atualizar ou deletar um registro inexistente
+    public ResponseEntity<ErrorMessage> handelerNotFound(Exception ex, HttpServletRequest request) {//HttpServletRequest: representa a requisicao http que chegouno seu servidor cm todas info que o cliente mandou
+        var status = HttpStatus.NOT_FOUND;
+        String errorMsg = FormatError.formatErrorNotFound(ex);
+        var detalhes = FormatError.formatErrorDetalhe(request);
+
+        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), errorMsg, detalhes));
+    }
+
+
+    @ExceptionHandler({
+            HttpRequestMethodNotSupportedException.class,//cliente tentou acessar um recurso com um metodo que o endpont nao suporta
+            HttpMediaTypeNotSupportedException.class//tipo de midia(content-type) que o servidor nao aceita
+    })
+    public ResponseEntity<ErrorMessage> handleHttpProtocolErrors(Exception ex, HttpServletRequest request) {
+        var status = HttpStatus.BAD_REQUEST;
+        String errorMsg = FormatError.formatErrorHttpProtocol(ex);
+        var detalhes = FormatError.formatErrorDetalhe(request);
+
+        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), errorMsg, detalhes));
+    }
+
+    @ExceptionHandler(Exception.class)//exception generica captura qualquer erro nao tratado
+    public ResponseEntity<ErrorMessage> handlerException(Exception ex, HttpServletRequest request) {
+        log.error("erro inesperado, ", ex);//n pode ir para producao, isso mostra o log d erro para q o dev possa rastrear a exception
+        var status = HttpStatus.INTERNAL_SERVER_ERROR;
+        var detalhes = FormatError.formatErrorDetalhe(request);
+
+        return ResponseEntity.status(status).body(new ErrorMessage(status.value(),
+                "Ocorreu um erro inesperado. Tente novamente mais tarde.", detalhes));
+    }
+}
     /*utilizar o @ExceptionHandler passando a class de erro MethodArgumentNotValidException
      * o metodo deve ser publico
      * devolver um ResponseEntity do tipo ErrorMessage
@@ -44,24 +104,27 @@ public class GlobalExceptionHandler {
      * pegar o campo com .getField()
      * pegar a msg de erro padrao com .getDefaultMessage()
      * }*/
-    @ExceptionHandler(MethodArgumentNotValidException.class)//quando viola as regras do requestDto
-    public ResponseEntity<ErrorMessage> handlerArgumentoInvalido(MethodArgumentNotValidException ex){
-        var status = HttpStatus.BAD_REQUEST;
-        var errorMessages = new ArrayList<String>();
-        var fieldErrors = ex.getBindingResult().getFieldErrors();
 
-        fieldErrors.forEach(e -> {
-            var msg = "O campo: " + e.getField() + " " + e.getDefaultMessage();
-            errorMessages.add(msg);
-        });
-        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), errorMessages));
-    }
 
-    @ExceptionHandler(NoHandlerFoundException.class)//quando o recurso nao e encontrado
-    public ResponseEntity<ErrorMessage> handlerNoHandlerFound(NoHandlerFoundException ex){
-        var status = HttpStatus.NOT_FOUND;
-        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), "Recurso não encontrado"));
-    }
+//    @ExceptionHandler(MethodArgumentNotValidException.class)//quando viola as regras do requestDto
+//    public ResponseEntity<ErrorMessage> handlerArgumentoInvalido(MethodArgumentNotValidException ex){
+//        var status = HttpStatus.BAD_REQUEST;
+//        var errorMessages = new ArrayList<String>();
+//        var fieldErrors = ex.getBindingResult().getFieldErrors();
+//
+//        fieldErrors.forEach(e -> {
+//            var msg = "O campo: " + e.getField() + " " + e.getDefaultMessage();
+//            errorMessages.add(msg);
+//        });
+//        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), errorMessages));
+//    }
+
+//    @ExceptionHandler(NoHandlerFoundException.class)//quando o recurso nao e encontrado
+//    public ResponseEntity<ErrorMessage> handlerNoHandlerFound(NoHandlerFoundException ex){
+//        var status = HttpStatus.NOT_FOUND;
+//        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), "Recurso não encontrado"));
+//    }
+
     /*
      * o erro NoHandlerFoundException nao dispara por padrao no spring quando bate em uma rota que nao existe,
      * o spring por padrao retorna direto o erro 404 padrao no container (tomcat).
@@ -72,109 +135,72 @@ public class GlobalExceptionHandler {
      *     spring.web.resources.add-mappings=false -> evita que ele tente servir arquivos estaticos
      */
 
-    @ExceptionHandler(ConstraintViolationException.class)//violacao dos parametros passados na url
-    public ResponseEntity<ErrorMessage> handlerConstraintViolation(ConstraintViolationException ex){
-        HttpStatus status = HttpStatus.BAD_REQUEST;
-        var errorMessages = new ArrayList<String>();
-        var fieldErrors = ex.getConstraintViolations();
 
-        fieldErrors.forEach(e -> {
-            String msg = "O parâmetro " + e.getPropertyPath() + " " + e.getMessage();
-            errorMessages.add(msg);
-        });
-        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), errorMessages));
-    }
+//    @ExceptionHandler(ConstraintViolationException.class)//violacao dos parametros passados na url
+//    public ResponseEntity<ErrorMessage> handlerConstraintViolation(ConstraintViolationException ex){
+//        HttpStatus status = HttpStatus.BAD_REQUEST;
+//        var errorMessages = new ArrayList<String>();
+//        var fieldErrors = ex.getConstraintViolations();
+//
+//        fieldErrors.forEach(e -> {
+//            String msg = "O parâmetro " + e.getPropertyPath() + " " + e.getMessage();
+//            errorMessages.add(msg);
+//        });
+//        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), errorMessages));
+//    }
 
-    @ExceptionHandler(DataIntegrityViolationException.class)//quando ocorre quebra de integridade no banco como colunas que sao unique
-    public ResponseEntity<ErrorMessage> handlerDataIntegrityViolation(DataIntegrityViolationException ex){
-        var status = HttpStatus.BAD_REQUEST; // ou HttpStatus.CONFLICT dependendo da regra
-        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), "Erro de integridade"));
-    }
+//    @ExceptionHandler(DataIntegrityViolationException.class)//quando ocorre quebra de integridade no banco como colunas que sao unique
+//    public ResponseEntity<ErrorMessage> handlerDataIntegrityViolation(DataIntegrityViolationException ex){
+//        var status = HttpStatus.BAD_REQUEST; // ou HttpStatus.CONFLICT dependendo da regra
+//        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), "Erro de integridade"));
+//    }
 
-    @ExceptionHandler(EmptyResultDataAccessException.class)//quando tenta acessar algo que nao existe no banco
-    public ResponseEntity<ErrorMessage> handlerEmptyResultDataAccess(EmptyResultDataAccessException ex){
-        var status = HttpStatus.BAD_REQUEST;
-        return ResponseEntity.status(status).body(new ErrorMessage(status.value(),
-                "Recurso não encontrado.\nNenhum registro foi encontrado com o ID informado."));
-    }
+//    @ExceptionHandler(EmptyResultDataAccessException.class)//quando tenta acessar algo que nao existe no banco
+//    public ResponseEntity<ErrorMessage> handlerEmptyResultDataAccess(EmptyResultDataAccessException ex){
+//        var status = HttpStatus.BAD_REQUEST;
+//        return ResponseEntity.status(status).body(new ErrorMessage(status.value(),
+//                "Recurso não encontrado.\nNenhum registro foi encontrado com o ID informado."));
+//    }
 
-    @ExceptionHandler(EntityNotFoundException.class)//quando tenta acessar uma entidade que nao existe no banco
-    public ResponseEntity<ErrorMessage> handlerEntityNotFound(EntityNotFoundException ex){
-        var status = HttpStatus.NOT_FOUND;
-        return ResponseEntity.status(status).body(new ErrorMessage(status.value(),
-                "Recurso não encontrado. " + ex.getMessage()));
-    }
+//    @ExceptionHandler(Ent        var detalhes = FormatError.formatErrorDetalhe(request);
+//ityNotFoundException.class)//quando tenta acessar uma entidade que nao existe no banco
+//    public ResponseEntity<ErrorMessage> handlerEntityNotFound(EntityNotFoundException ex){
+//        var status = HttpStatus.NOT_FOUND;
+//        return ResponseEntity.status(status).body(new ErrorMessage(status.value(),
+//                "Recurso não encontrado. " + ex.getMessage()));
+//    }
 
-    @ExceptionHandler(HttpMessageNotReadableException.class)//quando ocorre problema ao desserializar o json enviado pelo cliente
-    public ResponseEntity<ErrorMessage> handlerHttpMessageNotReadable(HttpMessageNotReadableException ex){
-        var status = HttpStatus.BAD_REQUEST;
-        return ResponseEntity.status(status).body(new ErrorMessage(status.value(),
-                "Requisição inválida. Verifique o corpo da mensagem."));
-    }
+//    @ExceptionHandler(HttpMessageNotReadableException.class)//quando ocorre problema ao desserializar o json enviado pelo cliente
+//    public ResponseEntity<ErrorMessage> handlerHttpMessageNotReadable(HttpMessageNotReadableException ex){
+//        var status = HttpStatus.BAD_REQUEST;
+//        return ResponseEntity.status(status).body(new ErrorMessage(status.value(),
+//                "Requisição inválida. Verifique o corpo da mensagem."));
+//    }
 
-    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)//quando o cliente chama a api com o metodo HTTP errado
-    public ResponseEntity<ErrorMessage> handlerHttpRequestMethodNotSupported(HttpRequestMethodNotSupportedException ex){
-        var status = HttpStatus.METHOD_NOT_ALLOWED;
-        var supported = ex.getSupportedMethods() != null ? String.join(", ", ex.getSupportedMethods()) : "Nenhum";
-        var errorMessage = "Método HTTP não suportado: " + ex.getMethod() + ". Métodos suportados: " + supported;
-        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), errorMessage));
-    }
+//    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)//quando o cliente chama a api com o metodo HTTP errado
+//    public ResponseEntity<ErrorMessage> handlerHttpRequestMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+//        var status = HttpStatus.METHOD_NOT_ALLOWED;
+//        var supported = ex.getSupportedMethods() != null ? String.join(", ", ex.getSupportedMethods()) : "Nenhum";
+//        var errorMessage = "Metodo HTTP não suportado: " + ex.getMethod() + ". Métodos suportados: " + supported;
+//        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), errorMessage));
+//    }
 
-    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)//quando o cliente envia um Content-Type nao suportado
-    public ResponseEntity<ErrorMessage> handlerHttpMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex){
-        var status = HttpStatus.UNSUPPORTED_MEDIA_TYPE;
-        var errorMessage = "Content-Type não suportado: " + ex.getContentType()
-                + ". Content-Types suportados: " + ex.getSupportedMediaTypes();
-        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), errorMessage));
-    }
+//    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)//quando o cliente envia um Content-Type nao suportado
+//    public ResponseEntity<ErrorMessage> handlerHttpMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex) {
+//        var status = HttpStatus.UNSUPPORTED_MEDIA_TYPE;
+//        var errorMessage = "Content-Type não suportado: " + ex.getContentType()
+//                + ". Content-Types suportados: " + ex.getSupportedMediaTypes();
+//        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), errorMessage));
+//    }
 
-    @ExceptionHandler(AccessDeniedException.class)//usuario autenticado mas sem permissao para acessar o recurso
-    public ResponseEntity<ErrorMessage> handlerAccessDenied(AccessDeniedException ex){
-        var status = HttpStatus.FORBIDDEN;
-        return ResponseEntity.status(status).body(new ErrorMessage(status.value(),
-                "Você não tem permissão para acessar este recurso."));
-    }
+//    //ps:n vou implementar security por agr
+//    @ExceptionHandler(AccessDeniedException.class)//usuario autenticado mas sem permissao para acessar o recurso
+//    public ResponseEntity<ErrorMessage> handlerAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
+//        var status = HttpStatus.FORBIDDEN;
+//        return ResponseEntity.status(status).body(new ErrorMessage(status.value(),
+//                "Você não tem permissão para acessar este recurso."));
+//    }
 
-    @ExceptionHandler(Exception.class)//exception generica captura qualquer erro nao tratado
-    public ResponseEntity<ErrorMessage> handlerException(Exception ex){
-        var status = HttpStatus.INTERNAL_SERVER_ERROR;
-        return ResponseEntity.status(status).body(new ErrorMessage(status.value(),
-                "Ocorreu um erro inesperado. Tente novamente mais tarde."));
-    }
-
-    @ExceptionHandler(NomeJaCadastradoException.class)
-    public ResponseEntity<ErrorMessage> nomeJaCadastradoHandler(NomeJaCadastradoException ex){
-        var status = HttpStatus.BAD_REQUEST;
-        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), ex.getMessage()));
-    }
-
-    /*
-    * utilizar a anotation @ExceptionHandler pasando a class de erro que iremos tratar no caso : EmailJaCadastradoException
-    * metodo publico retorna um ResponseEntity<pasando nos parametros a class de mensagem de erro>
-    * nome no metodo deve ser o nome da exception + handler
-    * nos parametros passamos o erro que estamos tratando e passamos ela par uma var (ex)
-    * criar uma var status pasando um http status com o codigo coreto
-    * retornar um ResponseEntity pasando o status e criando um body
-    * no body cria uma nova instancia de ErrorMessage pansndo o valor do statusCode e
-    * capturando a msg de erro com o ex.getMessage() e passando no construtor do ErrorMessage*/
-    @ExceptionHandler(EmailJaCadastradoException.class)
-    public ResponseEntity<ErrorMessage> emailJaCadastradoHandler(EmailJaCadastradoException ex){
-        var status = HttpStatus.BAD_REQUEST;
-        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), ex.getMessage()));
-    }
-
-    @ExceptionHandler(CpfJaCadastradoException.class)
-    public ResponseEntity<ErrorMessage> cpfJaCadastradoHandler(CpfJaCadastradoException ex){
-        var status = HttpStatus.BAD_REQUEST;
-        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), ex.getMessage()));
-    }
-
-    @ExceptionHandler(ClienteNaoEncontradoException.class)
-    public ResponseEntity<ErrorMessage> clienteNaoEcontradoHandler(ClienteNaoEncontradoException ex){
-        var status = HttpStatus.NOT_FOUND;
-        return ResponseEntity.status(status).body(new ErrorMessage(status.value(), ex.getMessage()));
-    }
-}
 
 /*BindingResult: e um objeto que existe dentro de um erro, e como se fosse uma
  * caixa onde o spring guarda todos os erros de validacao

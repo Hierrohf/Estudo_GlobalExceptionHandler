@@ -1,8 +1,12 @@
 package com.aula.exception.handler.projetoexception.exception.business;
 
-public class NomeJaCadastradoException extends RuntimeException{
+import com.aula.exception.handler.projetoexception.exception.ApplicationException;
+import org.springframework.http.HttpStatus;
+
+public class NomeJaCadastradoException extends ApplicationException {
 
     public NomeJaCadastradoException(String nome){
-        super("O Nome "+ nome +" já está cadastrado no sistema.");
+        super("O Nome "+ nome +" já está cadastrado no sistema.",
+                HttpStatus.CONFLICT);
     }
 }
